@@ -1,0 +1,228 @@
+#-*- mode: org -*-
+#+STARTUP: showall
+
+* Intro
+
+* Install Solr
+Requirements
+- java 8 or better
+
+* Start Solr
+- command
+<solr_home>/bin/solr start
+
+- solr admin
+http://localhost:8983
+
+* create solr core
+- command
+<solr_home>/bin/solr create -c <corename>
+
+Solr core is physical index, config, and transaction log
+
+* documents
+documents can be csv, json, ... 
+documents have key/values
+** add doc
+select core and click *Documents*
+select type and paste doc text
+
+* query
+Select core and click *Query*
+** Query options
+- request-handler :: /select (select and retrieve documents)
+- q :: query string *:* for all docs
+- fq :: filter query, restricts docs in cache but does not affect score  
+- sort :: sort by type asc/desc
+- start, rows :: which doc to show and how many 
+- fl :: field list to limit data returned
+- df :: default field
+- wt :: format of the returned doc (dft: json)
+- hl :: highlighting
+- facet :: faceting support
+
+* Schema
+file: managed-schema
+** schemaless
+documents determin schema
+** schema api
+https://lucene.apache.org/solr/guide/8_8/schema-api.html
+
+send a POST request to the /api/<collections|cores>/<name>/schema/ endpoint with a sequence of commands in JSON format to perform the requested actions. The following commands are supported:
+
+- add-field :: add a new field with parameters you provide.
+- delete-field :: delete a field.
+- replace-field :: replace an existing field with one that is differently configured.
+...
+** managed-schema
+sections:
+- fields,dynamic fields
+- misc: uniqueKey, copyField
+- field types
+
+* Document
+** document identifier
+- if provided in document, this will avoid duplicate docs
+- unique key should be a string type
+- if unique key is not defined, then solr will generate one
+- if doc w/o unique key is added then there could be dups in index
+
+** index fields in doc
+- indexed fields :: allow search, sort, faceting, group by, ...
+- indexed fields take space in index
+** stored fields
+- stored fields :: can be displayed
+
+*** multivalue fields
+- mv fields can appear in doc multiple times with different values
+** dynamic fields
+
+** copy fields
+- multiple fields can be copied to "catch-all" copy field
+- this allows search to match on values in the copied field if the default field is the copy field
+- copy fields should not be stored, so they are not displayed on the search
+
+** field types
+- text :: analyzed ...
+- string :: small fields, not analyzed, not tokenized, mixed case matching 
+- date :: iso format yyyy-mm-ddThh:mm:ssZ
+
+* Index
+** add documents to index
+1. send POST request to solr/<core>/update (update handler)
+2. webapp > core > update-handler
+3. use core schema.xml (tokenize/analyze document)
+4. tlog (transaction log)
+5. lucene index
+6. response writer to send response to requester
+
+** common requests
+- add :: add documents to index
+- delete :: delete index (all or spec docs)
+- select?q :: search/query index 
+- atomic update
+- commit
+- optimizations
+
+** document updates
+- atomic updates :: update version and all fields in doc (so do not lose updates); 
+  like relational db updates
+
+- in-place updates :: update docvalue, not indexed or stored
+- optomistic concurrency :: add document version to the request, 
+  if version not changed then update completes, 
+  otherwise update fails with 409 conflict error
+
+** commits
+- hard commit :: commit doc to durable storage
+- soft commit :: near real time, doc made searchable but not flushed to durable storage
+
+*** auto commit 
+set in solrconfig.xml; options are:
+- maxDocs :: number of document updates
+- maxTime :: dft 15000 (ms); every 15 secs
+- maxSize :: size of document updates
+
+ 
+** nested documents
+Parent/child documents
+
+- _root_ :: field of parent id, solr sets to parent id
+
+*** classic childdoc, unlabeled
+
+#+BEGIN_SRC json
+{
+ "id":"2",
+ "_childDocuments_":[
+   {
+    "id":"3",
+    "comment_txt":"child comment"
+   }
+  ]
+}
+#+END_SRC
+
+*** labelled releationship - childdoc (preferred)
+
+
+#+BEGIN_SRC json
+{
+ "id":"4",
+ "type_string": "post",
+ "comment_string": [{
+    "id":"5",
+    "comment_txt":"child comment 1".
+    "_version_":1444444444444
+   },
+   {
+    "id":"6",
+    "comment_txt":"child comment 2"
+    "_version_":1444444444455
+   }
+  ]
+}
+#+END_SRC
+
+** Re-indexing
+
+if a field is added to the managed-schema, then
+reindexing is needed so the field is added to the index
+
+1. create new core from the orig core (cp -r old new)
+2. edit new schema as needed
+3. re-load the documents to the new core
+4. switch the new and old core from the core admin swap ui
+5. test new core, then delete old core
+
+** Optimize Index
+
+deleted documents are marked deleted.
+
+optimizing index takes time and should be done by cron job.
+
+* Text Analysis
+
+** Text Analysis Elements
+- Analyzer
+- Tokenizer
+- chain of token filters
+
+** Analysis Strategies
+- remove stop words
+- lowercase
+- 
+** text_general type
+*** analyzer index
+- stop filter
+- lower case
+
+*** analyzer query/search
+- stop filter
+- synonym graph
+- lower case 
+
+** stop words filter
+of, the, an -- removed
+
+** lowercase filter
+change the text to lowercase
+
+** Text Analysis Form
+See Core/Analysis
+- Field Value (index) :: document text
+- Field Value (query) :: query string
+- Analyze fieldname (eg text_general)
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
